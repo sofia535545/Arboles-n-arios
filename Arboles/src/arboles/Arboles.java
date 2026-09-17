@@ -32,6 +32,20 @@ public class Arboles {
                                 int cedulaActualizar = Integer.parseInt(JOptionPane.showInputDialog(null, "Ingresa tu cedula"));
                                 arbol.Actualizar(cedulaActualizar);
                                 break;
+
+                            case 4:
+                                if (arbol.getRaiz() == null) {
+                                    JOptionPane.showMessageDialog(null, "El arbol esta vacio, primero agrega una persona"
+                                            + " o carga el arbol de prueba (opcion 5)");
+                                } else {
+                                    new ventanaArbol(arbol.getRaiz());
+                                }
+                                break;
+
+                            case 5:
+                                arbol.cargarArbolPrueba();
+                                JOptionPane.showMessageDialog(null, "Arbol de prueba cargado");
+                                break;
                             case 0:
                                 regresarPersona = true;
                                 break;
@@ -216,6 +230,8 @@ public class Arboles {
                 + "\n1.	Registrar"
                 + "\n2.	Eliminar"
                 + "\n3.	Actualizar"
+                + "\n4.	Cargar datos prueba"
+                + "\n5.	Datos prueba"
                 + "\n0. Regresar"
                 + "\n\nIngrese una opcion"));
         return opc;

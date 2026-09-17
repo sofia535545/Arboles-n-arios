@@ -1,119 +1,245 @@
 package arboles;
 
 import java.awt.Color;
-import java.awt.Dimension;//saber tamaño en total de JPanel
+import java.awt.Cursor;
+import java.awt.Dimension;
 import java.awt.FontMetrics;
-import java.awt.Graphics;//Dibujar 
-import java.awt.Graphics2D;//Dibujar en una mejor version
+import java.awt.Graphics;
+import java.awt.Graphics2D;
+import java.awt.Point;
 import java.awt.RenderingHints;
+import java.awt.event.ComponentAdapter;
+import java.awt.event.ComponentEvent;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+import java.awt.event.MouseMotionAdapter;
+import java.awt.event.MouseWheelEvent;
+import java.awt.event.MouseWheelListener;
 import javax.swing.JPanel;//Lienzo en blanco para dibujar
 
 public class arbolPanel extends JPanel {
 
-    //atributos de configuracion del dibujo
+    //atributos de configuracion del dibujo (coordenadas "reales" del arbol, sin zoom)
     private Nodo raiz;
-    private int anchoCasillero = 110;//pixeles horizontales que ocupa cada persona sin hijos
-    private int altoNivel = 100;//separacion vertical entre generaciones
-    private int anchoCaja = 90;
+    private int anchoCasillero = 130;
+    private int altoNivel = 100;
+    private int anchoCaja = 110;
     private int altoCaja = 40;
-    private int margen = 30;//separacion del Jpanel del bordo
+    private int margen = 30;
 
-    //constructor: recibe la raiz del arbol ya construido
+    //=========================================================
+    // NUEVO: el panel mueve y hace zoom por su cuenta, sin depender
+    // de que la ventana tenga un JScrollPane. offsetX/offsetY mueven
+    // la vista, escala hace zoom in/out.
+    //=========================================================
+    private double escala = 1.0;
+    private double offsetX = 0;
+    private double offsetY = 0;
+    private Point puntoArrastre;
+    private boolean ajusteInicialHecho = false;
+
     public arbolPanel(Nodo raiz) {
         this.raiz = raiz;
-        this.setBackground(Color.WHITE);//un poco de CSS para dar color 
+        this.setBackground(Color.WHITE);
+        habilitarPanYZoom();
     }
 
-    //calcula cuantos "casilleros" de ancho necesita el subarbol de r
-    public int calcularAncho(Nodo r) {
-        int resultado;
-
-        if (r.isSw() == false) {
-            //no tiene hijos: ocupa un solo casillero
-            resultado = 1;
-        } else {
-            int suma = 0;//contador para guardar la cantidad de hijos
-            Nodo p = r.getLigaLista();
-
-            while (p != null) {
-                //conocer la cantidad de hijos en total
-                suma = suma + calcularAncho(p);//sumar los datos ya encontrados con los que tiene el contador
-                p = p.getLiga();
+    private void habilitarPanYZoom() {
+        addMouseListener(new MouseAdapter() {
+            @Override
+            public void mousePressed(MouseEvent e) {
+                puntoArrastre = e.getPoint();
+                setCursor(Cursor.getPredefinedCursor(Cursor.MOVE_CURSOR));
             }
 
-            resultado = suma;
+            @Override
+            public void mouseReleased(MouseEvent e) {
+                setCursor(Cursor.getPredefinedCursor(Cursor.DEFAULT_CURSOR));
+            }
+
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                if (e.getClickCount() == 2) {
+                    verArbolCompleto(); //doble clic = ajustar zoom para ver todo
+                }
+            }
+        });
+
+        addMouseMotionListener(new MouseMotionAdapter() {
+            @Override
+            public void mouseDragged(MouseEvent e) {
+                if (puntoArrastre == null) {
+                    return;
+                }
+                offsetX += e.getX() - puntoArrastre.x;
+                offsetY += e.getY() - puntoArrastre.y;
+                puntoArrastre = e.getPoint();
+                repaint();
+            }
+        });
+
+        addMouseWheelListener(new MouseWheelListener() {
+            @Override
+            public void mouseWheelMoved(MouseWheelEvent e) {
+                double factor = (e.getWheelRotation() < 0) ? 1.1 : 0.9;
+                double nuevaEscala = escala * factor;
+
+                //limites razonables de zoom (10% a 300%)
+                if (nuevaEscala < 0.1) {
+                    nuevaEscala = 0.1;
+                }
+                if (nuevaEscala > 3.0) {
+                    nuevaEscala = 3.0;
+                }
+
+                //hacer zoom centrado en la posicion del mouse, no en la esquina
+                double mx = e.getX();
+                double my = e.getY();
+                offsetX = mx - (mx - offsetX) * (nuevaEscala / escala);
+                offsetY = my - (my - offsetY) * (nuevaEscala / escala);
+
+                escala = nuevaEscala;
+                repaint();
+            }
+        });
+
+        //la primera vez que el panel tiene un tamaño real, ajustar el zoom
+        //automaticamente para que se vea el arbol completo
+        addComponentListener(new ComponentAdapter() {
+            @Override
+            public void componentResized(ComponentEvent e) {
+                if (!ajusteInicialHecho && getWidth() > 0 && getHeight() > 0) {
+                    verArbolCompleto();
+                    ajusteInicialHecho = true;
+                }
+            }
+        });
+    }
+
+    //ajusta escala y offset para que el arbol completo entre en el panel visible.
+    //Tambien se puede llamar desde un boton "Ver todo" si lo agregas al menu.
+    public void verArbolCompleto() {
+        if (raiz == null || getWidth() == 0 || getHeight() == 0) {
+            return;
         }
 
+        int anchoArbol = margen * 2 + calcularAncho(raiz) * anchoCasillero;
+        int altoArbol = margen * 2 + calcularProfundidad(raiz) * altoNivel;
+
+        double escalaX = (double) getWidth() / anchoArbol;
+        double escalaY = (double) getHeight() / altoArbol;
+        double nuevaEscala = Math.min(escalaX, escalaY);
+
+        if (nuevaEscala > 1.0) {
+            nuevaEscala = 1.0; //no agrandar arboles chicos, solo achicar los grandes
+        }
+        if (nuevaEscala < 0.1) {
+            nuevaEscala = 0.1;
+        }
+
+        escala = nuevaEscala;
+        //centrar el arbol en el panel
+        offsetX = (getWidth() - anchoArbol * escala) / 2.0;
+        offsetY = (getHeight() - altoArbol * escala) / 2.0;
+
+        repaint();
+    }
+
+    public void setRaiz(Nodo raiz) {
+        this.raiz = raiz;
+        ajusteInicialHecho = false; //recalcular el zoom para el nuevo arbol
+        revalidate();
+        repaint();
+    }
+
+    public void refrescar() {
+        revalidate();
+        repaint();
+    }
+
+    public int calcularAncho(Nodo r) {
+        int resultado;
+        if (r.isSw() == false) {
+            resultado = 1;
+        } else {
+            int suma = 0;
+            Nodo p = r.getLigaLista();
+            while (p != null) {
+                suma = suma + calcularAncho(p);
+                p = p.getLiga();
+            }
+            resultado = suma;
+        }
         return resultado;
     }
 
-    //calcula cuantos niveles de profundidad tiene el subarbol de r
     public int calcularProfundidad(Nodo r) {
         int resultado;
-
-        if (r.isSw() == false) {//no tiene hijos: ocupa un solo casillero
+        if (r.isSw() == false) {
             resultado = 1;
         } else {
-            int maxProfundidadHijos = 0;//guarda la cantidad de hijos encontrados
-            Nodo p = r.getLigaLista();//recorre hijos
-
+            int maxProfundidadHijos = 0;
+            Nodo p = r.getLigaLista();
             while (p != null) {
-                int profundidadHijo = calcularProfundidad(p);//buscar mas sobre los hijos y si estos tienen hijos
-                if (profundidadHijo > maxProfundidadHijos) {//comparar la cantidad de hijos entre hermanos
+                int profundidadHijo = calcularProfundidad(p);
+                if (profundidadHijo > maxProfundidadHijos) {
                     maxProfundidadHijos = profundidadHijo;
                 }
                 p = p.getLiga();
             }
-
-            resultado = 1 + maxProfundidadHijos;//sumar contador
+            resultado = 1 + maxProfundidadHijos;
         }
-
-        return resultado;//dar resultado del que tiene mayor cantidad de hijos
+        return resultado;
     }
 
-    //el tamaño que el panel necesita para mostrar el arbol completo sin cortarse
+    //el panel ya NO le pide a la ventana un tamaño gigante: el zoom/pan
+    //propio se encarga de mostrar el arbol completo dentro del tamaño
+    //que la ventana le de. Un tamaño por defecto razonable como sugerencia.
     @Override
     public Dimension getPreferredSize() {
-        int ancho = margen * 2;//se multiplica por dos para que genere mas espacio 
-        int alto = margen * 2;
-
-        if (raiz != null) {
-            ancho = ancho + calcularAncho(raiz) * anchoCasillero;//formula para saber el espacio que necesita la familia 
-            alto = alto + calcularProfundidad(raiz) * altoNivel;
-        }
-
-        return new Dimension(ancho, alto);//indica el tamaño de JPanel
+        return new Dimension(900, 650);
     }
 
     @Override
-    //basicamente el metodo que prepara todo para dibujar
     protected void paintComponent(Graphics g) {
-        super.paintComponent(g);//limpiar el JPanel
-        Graphics2D g2 = (Graphics2D) g;//convertir el lapiz en uno mas avanzado
-        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);//estetica
+        super.paintComponent(g);
+        Graphics2D g2 = (Graphics2D) g;
+        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 
-        if (raiz != null) {//verificar si existe el padre principal
-            int xIzquierda = margen;//mirar donde empieza el dibujo
-            int xDerecha = margen + calcularAncho(raiz) * anchoCasillero;//mira donde termina el dibujo
-            dibujarNodo(g2, raiz, xIzquierda, xDerecha, 0);//informacion que necesita el metodo para que realmente dubuje
+        if (raiz != null) {
+            //aplicar el pan (offset) y el zoom (escala) antes de dibujar
+            g2.translate(offsetX, offsetY);
+            g2.scale(escala, escala);
+
+            int xIzquierda = margen;
+            int xDerecha = margen + calcularAncho(raiz) * anchoCasillero;
+            dibujarNodo(g2, raiz, xIzquierda, xDerecha, 0);
         }
     }
 
-    //dibuja el nodo r centrado en el rango [xIzquierda, xDerecha], y reparte ese rango entre sus hijos
-    private void dibujarNodo(Graphics2D g2, Nodo r, int xIzquierda, int xDerecha, int nivel) {
-        //calcular donde debe de ir el nodo Raiz
-        int centroX = (xIzquierda + xDerecha) / 2;//buscar la mitad en x
-        int y = margen + nivel * altoNivel;//tamaño en y
+    private String recortarTexto(FontMetrics fm, String texto, int anchoMaximo) {
+        if (fm.stringWidth(texto) <= anchoMaximo) {
+            return texto;
+        }
+        String recortado = texto;
+        while (recortado.length() > 1 && fm.stringWidth(recortado + "...") > anchoMaximo) {
+            recortado = recortado.substring(0, recortado.length() - 1);
+        }
+        return recortado + "...";
+    }
 
-        //si tiene hijos, primero dibujamos las lineas y los hijos (para que queden detras de la caja del padre al final)
-        if (r.isSw() == true) {//si tiene hijos
-            int anchoTotalUnidades = calcularAncho(r);//espacio total de todos los hijos
-            int anchoTotalPixeles = xDerecha - xIzquierda;//espacio en pixeles que se necesita en JPanel
-            int xActual = xIzquierda;//cursor se mueve izq-der a medida que se asigna espacio a cada hijo
+    private void dibujarNodo(Graphics2D g2, Nodo r, int xIzquierda, int xDerecha, int nivel) {
+        int centroX = (xIzquierda + xDerecha) / 2;
+        int y = margen + nivel * altoNivel;
+
+        if (r.isSw() == true) {
+            int anchoTotalUnidades = calcularAncho(r);
+            int anchoTotalPixeles = xDerecha - xIzquierda;
+            int xActual = xIzquierda;
 
             Nodo p = r.getLigaLista();
 
-            while (p != null) {//recorrer y asignar valores por hijo
+            while (p != null) {
                 int anchoHijoUnidades = calcularAncho(p);
                 int anchoHijoPixeles = anchoTotalPixeles * anchoHijoUnidades / anchoTotalUnidades;
 
@@ -122,9 +248,8 @@ public class arbolPanel extends JPanel {
                 int hijoCentroX = (hijoXIzquierda + hijoXDerecha) / 2;
                 int hijoY = margen + (nivel + 1) * altoNivel;
 
-                //linea desde el borde inferior del padre hasta el borde superior del hijo
-                g2.setColor(Color.GRAY);//poner color
-                g2.drawLine(centroX, y + altoCaja / 2, hijoCentroX, hijoY - altoCaja / 2);//decir donde empieza y termina la linea en padre e hijo
+                g2.setColor(Color.GRAY);
+                g2.drawLine(centroX, y + altoCaja / 2, hijoCentroX, hijoY - altoCaja / 2);
 
                 dibujarNodo(g2, p, hijoXIzquierda, hijoXDerecha, nivel + 1);
 
@@ -133,7 +258,6 @@ public class arbolPanel extends JPanel {
             }
         }
 
-        //la caja del nodo actual, dibujada al final para que quede sobre las lineas
         int cajaX = centroX - anchoCaja / 2;
         int cajaY = y - altoCaja / 2;
 
@@ -147,11 +271,14 @@ public class arbolPanel extends JPanel {
 
         g2.setColor(Color.BLACK);
         FontMetrics fm = g2.getFontMetrics();
+        int anchoMaximoTexto = anchoCaja - 10;
 
-        int anchoTextoNombre = fm.stringWidth(nombre);
-        g2.drawString(nombre, centroX - anchoTextoNombre / 2, y - 3);
+        String nombreRecortado = recortarTexto(fm, nombre, anchoMaximoTexto);
+        int anchoTextoNombre = fm.stringWidth(nombreRecortado);
+        g2.drawString(nombreRecortado, centroX - anchoTextoNombre / 2, y - 3);
 
-        int anchoTextoCedula = fm.stringWidth(cedula);
-        g2.drawString(cedula, centroX - anchoTextoCedula / 2, y + 13);
+        String cedulaRecortada = recortarTexto(fm, cedula, anchoMaximoTexto);
+        int anchoTextoCedula = fm.stringWidth(cedulaRecortada);
+        g2.drawString(cedulaRecortada, centroX - anchoTextoCedula / 2, y + 13);
     }
 }

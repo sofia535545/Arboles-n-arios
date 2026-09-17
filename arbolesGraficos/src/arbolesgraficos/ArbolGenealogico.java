@@ -22,6 +22,52 @@ public class ArbolGenealogico {
         this.Raiz = Raiz;
     }
 
+    public void cargarArbolPrueba() {
+        Nodo x = new Nodo(new Persona("X", 100, LocalDate.of(1950, 1, 10)));
+        Nodo c = new Nodo(new Persona("C", 150, LocalDate.of(1975, 3, 22)));
+        Nodo f = new Nodo(new Persona("F", 200, LocalDate.of(1977, 7, 5)));
+        Nodo h = new Nodo(new Persona("H", 250, LocalDate.of(1979, 11, 30)));
+        Nodo d = new Nodo(new Persona("D", 400, LocalDate.of(1998, 2, 14)));
+        Nodo e = new Nodo(new Persona("E", 450, LocalDate.of(2000, 6, 9)));
+        Nodo w = new Nodo(new Persona("W", 500, LocalDate.of(1999, 4, 18)));
+        Nodo g = new Nodo(new Persona("G", 550, LocalDate.of(2001, 9, 27)));
+        Nodo k = new Nodo(new Persona("K", 600, LocalDate.of(2002, 12, 3)));
+        Nodo a = new Nodo(new Persona("A", 700, LocalDate.of(2020, 5, 15)));
+        Nodo b = new Nodo(new Persona("B", 750, LocalDate.of(2021, 8, 21)));
+        Nodo z = new Nodo(new Persona("Z", 800, LocalDate.of(2019, 10, 2)));
+
+        //enlazar hermanos entre si (getLiga)
+        c.setLiga(f);
+        f.setLiga(h);
+
+        d.setLiga(e);
+
+        w.setLiga(g);
+        g.setLiga(k);
+
+        a.setLiga(b);
+
+        //marcar quien tiene hijos (sw=true) y apuntar a su lista de hijos (getLigaLista)
+        x.setSw(true);
+        x.setLigaLista(c);
+
+        c.setSw(true);
+        c.setLigaLista(d);
+        //F no tiene hijos, queda como hoja
+
+        h.setSw(true);
+        h.setLigaLista(w);
+
+        w.setSw(true);
+        w.setLigaLista(a);
+
+        g.setSw(true);
+        g.setLigaLista(z);
+        //K no tiene hijos, queda como hoja
+
+        Raiz = x;
+    }
+
     //================= MENU GESTION DE PERSONAS =================
     //metodo construir arbol    
     public void pedirDatos() {
@@ -82,11 +128,11 @@ public class ArbolGenealogico {
                     Resultado = P;
                 }
             } else {
-                Nodo encontradoEnHijos = buscarNodo(P.getLigaLista(), cedula); // <-- capturar el resultado
+                Nodo encontradoEnHijos = buscarNodo(P.getLigaLista(), cedula); //capturar el resultado
                 if (encontradoEnHijos != null) {
-                    Resultado = encontradoEnHijos; // <-- guardarlo si se encontró algo
+                    Resultado = encontradoEnHijos; //guardarlo si se encontró algo
                 }
-                // también hay que revisar al propio padre, no solo a sus hijos:
+                // también hay que revisar al propio padre, no solo a sus hijos
                 if (P.getDato().getCedula() == cedula) {
                     Resultado = P;
                 }
@@ -107,14 +153,14 @@ public class ArbolGenealogico {
             boolean Encontrado = false;
 
             //recorrer
-            while (Q != null && Encontrado == false) {
+            while (Q != null && Encontrado == true) {
                 //comprobar cedula del mayor y poner posicion de Anterior
                 if (Q.getDato().getCedula() < Nuevo.getDato().getCedula()) {//comprobar cedula del hijo
                     Anterior = Q;
                     Q = Q.getLiga();
                 } else {
                     // encontramos el lugar: la cedula de Q ya es mayor o igual al dato Nuevo
-                    Encontrado = true;
+                    Encontrado = false;
                 }
             }
 
@@ -136,13 +182,7 @@ public class ArbolGenealogico {
         Nodo mayor = null;
 
         while (p != null) {
-            Nodo edadHijo;
-
-            if (p.isSw() == false) {
-                edadHijo = p;
-            } else {
-                edadHijo = p.getLigaLista();
-            }
+            Nodo edadHijo = p;
 
             if (mayor == null || edadHijo.getDato().getFechaNacimiento().isBefore(mayor.getDato().getFechaNacimiento())) {
                 mayor = edadHijo;
@@ -197,17 +237,17 @@ public class ArbolGenealogico {
                     //comprobar si el hijo mayor es padre o no
                     if (edadMayor.isSw() == false) {//hijo mayor no tiene familia
                         p.setDato(edadMayor.getDato());
-                        if (Q.getLiga() != null) {
-                            ant_Q.setLiga(Q.getLiga());
-
-                        } else if (Q.getLiga() == null) {//hijo unico
-                            p.setLigaLista(null);
-                            p.setSw(false);
-
+                        if (ant_Q == null) {
+                            //aca SI es el primero de la lista: puede ser hijo unico, o el primero con hermanos despues
+                            p.setLigaLista(Q.getLiga());
+                            if (Q.getLiga() == null) {
+                                p.setSw(false);
+                            }
                         } else {
-                            ant_Q.setLiga(null);
-
+                            //habia alguien antes de Q: nunca se toca la LigaLista de p
+                            ant_Q.setLiga(Q.getLiga());
                         }
+
                     } else {//hijo mayor tiene familia
                         Nodo x = Q.getLigaLista();
                         Nodo siguiente = Q.getLiga();
@@ -258,12 +298,11 @@ public class ArbolGenealogico {
                     case 1:
                         String nombreNuevo = JOptionPane.showInputDialog(null, "Ingresa el nuevo nombre");
                         encontrado.getDato().setNombre(nombreNuevo);
-
+                        ordenar(Raiz);
                         break;
                     case 2:
                         int cedulaNuevo = Integer.parseInt(JOptionPane.showInputDialog(null, "Ingresa la nueva cedula"));
                         encontrado.getDato().setCedula(cedulaNuevo);
-                        ordenar(Raiz);
                         break;
                     case 3:
                         LocalDate fechaNacimiento = null;
@@ -303,21 +342,9 @@ public class ArbolGenealogico {
                 p = p.getLiga();
             }
 
-            if (menor != r) {
-                //se intercambia la persona junto con su condicion de padre y su lista de hijos,
-                //para que los hijos de "r" no se queden pegados al nodo equivocado
-                Persona datoTemporal = r.getDato();
-                boolean swTemporal = r.isSw();
-                Nodo ligaListaTemporal = r.getLigaLista();
-
-                r.setDato(menor.getDato());
-                r.setSw(menor.isSw());
-                r.setLigaLista(menor.getLigaLista());
-
-                menor.setDato(datoTemporal);
-                menor.setSw(swTemporal);
-                menor.setLigaLista(ligaListaTemporal);
-            }
+            Persona temporal = r.getDato();
+            r.setDato(menor.getDato());
+            menor.setDato(temporal);
 
             if (r.isSw() == true) {
                 ordenar(r.getLigaLista());//ordena también los hijos de r
@@ -536,18 +563,6 @@ public class ArbolGenealogico {
         }
     }
 
-    private String buscarDescendientesDesde(Nodo p) {
-        String resultado = "";
-        while (p != null) {
-            resultado = resultado + p.getDato().getNombre() + ", ";
-            if (p.isSw() == true) {
-                resultado = resultado + buscarDescendientesDesde(p.getLigaLista());   // baja a SUS hijos, no busca de nuevo
-            }
-            p = p.getLiga();   // sigue con el hermano siguiente, sin cortar el ciclo
-        }
-        return resultado;
-    }
-
     public void mostrarDescendientes(int cedula) {
         Nodo persona = buscarNodo(Raiz, cedula);
 
@@ -565,6 +580,18 @@ public class ArbolGenealogico {
 
         JOptionPane.showMessageDialog(null,
                 "Los descendientes de " + persona.getDato().getNombre() + " son: " + descendientes);
+    }
+
+    private String buscarDescendientesDesde(Nodo p) {
+        String resultado = "";
+        while (p != null) {
+            resultado = resultado + p.getDato().getNombre() + ", ";
+            if (p.isSw() == true) {
+                resultado = resultado + buscarDescendientesDesde(p.getLigaLista());   // baja a SUS hijos, no busca de nuevo
+            }
+            p = p.getLiga();   // sigue con el hermano siguiente, sin cortar el ciclo
+        }
+        return resultado;
     }
 
 //================= MENU CONSULTAS ESTRUCTURALES =================
@@ -632,34 +659,35 @@ public class ArbolGenealogico {
         }
     }
 
-    private int buscarNivel(Nodo r, int mayorProfundidad) {
-        Nodo p = r;
+    // profundidad (numero de niveles) del subarbol que cuelga de r
+    private int buscarNivel(Nodo r) {
+        int resultado;
 
-        while (p != null) {
-            int profundidad;
+        if (r.isSw() == false) {
+            resultado = 0; //hoja: no tiene nada debajo, es el nivel 0 de su propia rama
+        } else {
+            int maxProfundidadHijos = 0;
+            Nodo p = r.getLigaLista();
 
-            if (p.isSw() == false) {
-                profundidad = 1;//hoja: cuenta como 1 nivel
-            } else {
-                profundidad = buscarNivel(p.getLigaLista(), mayorProfundidad + 1);//el +1 es por este mismo nivel, sumado a lo que devuelva la rama
+            while (p != null) {
+                int profundidadHijo = buscarNivel(p);
+                if (profundidadHijo > maxProfundidadHijos) {
+                    maxProfundidadHijos = profundidadHijo;
+                }
+                p = p.getLiga();
             }
 
-            if (profundidad > mayorProfundidad) {
-                mayorProfundidad = profundidad;
-            }
-
-            p = p.getLiga();
+            resultado = 1 + maxProfundidadHijos;
         }
 
-        return mayorProfundidad;
+        return resultado;
     }
 
     public void mostarNivel() {
-        int nivel = buscarNivel(Raiz, 0);
-
-        if (nivel == 0) {
-            JOptionPane.showMessageDialog(null, "No hay niveles");
+        if (Raiz == null) {
+            JOptionPane.showMessageDialog(null, "El arbol esta vacio");
         } else {
+            int nivel = buscarNivel(Raiz);
             JOptionPane.showMessageDialog(null, "El nivel total del arbol es " + nivel);
         }
     }
@@ -744,19 +772,15 @@ public class ArbolGenealogico {
     }
 
     public void ModtrarNodoProfundidad() {
-        Nodo persona = buscarNodoProfundidad(Raiz);
-
-        if (persona == null) {
+        if (Raiz == null) {
             JOptionPane.showMessageDialog(null, "Arbol vacio");
-
-        } else {
-            int nivel = buscarNivelDato(Raiz, persona.getDato().getCedula(), 1);
-            JOptionPane.showMessageDialog(null, "La informacion de esta persona es: "
-                    + "\n Nombre: " + persona.getDato().getNombre()
-                    + "\n Cedula: " + persona.getDato().getCedula()
-                    + "\n Fecha de nacimiento: " + persona.getDato().getFechaNacimiento()
-                    + "\n Nivel: " + nivel);
+            return;
         }
+
+        int nivelMasProfundo = buscarNivel(Raiz); // ya viene en base 0, sin restar nada
+
+        String personas = nivelPersonas(Raiz, nivelMasProfundo, 0);
+        JOptionPane.showMessageDialog(null, "Las personas en el nivel mas profundo (nivel " + nivelMasProfundo + ") son:" + personas);
     }
 
     //================= MENU OPERACIONES ADICIONALES =================
@@ -778,7 +802,16 @@ public class ArbolGenealogico {
     }
 
     public void infoElinminarNivel(int nivel) {
-        String personas = nivelPersonasCedulas(Raiz, nivel, 0);
+        if (Raiz == null) {
+            JOptionPane.showMessageDialog(null, "El arbol esta vacio");
+            return;
+        }
+        if (nivel == 0) {
+            JOptionPane.showMessageDialog(null, "No se puede eliminar el nivel de la raiz");
+            return;
+        }
+
+        String personas = nivelPersonasCedulas(Raiz, nivel, 0); //el mismo metodo que ya tenias
 
         if (personas.equals("")) {
             JOptionPane.showMessageDialog(null, "En este nivel no existen datos");
@@ -786,13 +819,52 @@ public class ArbolGenealogico {
             String[] partes = personas.split(", ");
 
             for (int i = 0; i < partes.length; i++) {
-                //el nombre viene guardado en "personas", no la cedula
-                //ver nota abajo sobre este punto
                 int cedula = Integer.parseInt(partes[i]);
-                Eliminar(Raiz, cedula);
+                eliminarUnoDelNivel(cedula); //reemplaza a Eliminar()
             }
 
             JOptionPane.showMessageDialog(null, "Nivel eliminado con exito");
+        }
+    }
+
+    private void eliminarUnoDelNivel(int cedula) {
+        Nodo nodo = buscarNodo(Raiz, cedula);
+        if (nodo == null) {
+            return;
+        }
+
+        Nodo padre = buscarPadre(Raiz, cedula, Raiz);
+        Nodo listaHermanos = (padre == null) ? Raiz : padre.getLigaLista();
+
+        Nodo actual = listaHermanos;
+        Nodo anterior = null;
+        while (actual != nodo) {
+            anterior = actual;
+            actual = actual.getLiga();
+        }
+
+        Nodo reemplazo; //lo que ocupa el lugar del nodo eliminado
+        if (nodo.isSw() == false) {
+            reemplazo = nodo.getLiga(); //no tenia hijos: se salta
+        } else {
+            Nodo hijos = nodo.getLigaLista();
+            Nodo ultimoHijo = hijos;
+            while (ultimoHijo.getLiga() != null) {
+                ultimoHijo = ultimoHijo.getLiga();
+            }
+            ultimoHijo.setLiga(nodo.getLiga()); //los hijos quedan seguidos de sus antiguos "tios"
+            reemplazo = hijos;
+        }
+
+        if (anterior == null) {
+            if (padre == null) {
+                Raiz = reemplazo;
+            } else {
+                padre.setLigaLista(reemplazo);
+                padre.setSw(reemplazo != null);
+            }
+        } else {
+            anterior.setLiga(reemplazo);
         }
     }
 
@@ -1181,7 +1253,7 @@ public class ArbolGenealogico {
     }
 
     public String nivelventana() {
-        int nivel = buscarNivel(Raiz, 0);
+        int nivel = buscarNivel(Raiz);
 
         if (nivel == 0) {
             return "No hay niveles";
